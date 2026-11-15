@@ -1,0 +1,47 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.seafood.ledger'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.seafood.ledger'
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName '3.2'
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+        }
+        release {
+            // 自己用，debug 签名就行，能装即可
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+// 把仓库根目录那份网页拷进 assets（不用手动复制，改完代码直接编译就是新的）
+def syncWeb = tasks.register('syncWeb', Copy) {
+    from(rootProject.projectDir.parentFile) {
+        include 'index.html'
+        include 'styles.css'
+        include 'logic.js'
+        include 'app.js'
+    }
+    into layout.projectDirectory.dir('src/main/assets')
+}
+
+tasks.matching { it.name == 'mergeDebugAssets' || it.name == 'mergeReleaseAssets' }.configureEach {
+    dependsOn syncWeb
+}
