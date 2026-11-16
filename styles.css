@@ -15,9 +15,21 @@
   --ok: #1f7a5c;
   --r: 14px;
   --nav-h: 60px;
+  --kb: 0px;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+/* 点下去要有一点反应，不然像没点上 */
+button { transition: transform .09s ease, background-color .12s ease, color .12s ease; }
+button:active { transform: scale(.955); }
+
+/* 换页时轻轻淡入一下 */
+.main.page-in { animation: pageIn .16s ease-out; }
+@keyframes pageIn {
+  from { opacity: .55; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
 
 html, body {
   margin: 0; padding: 0;
@@ -27,6 +39,10 @@ html, body {
   -webkit-text-size-adjust: 100%;
 }
 body { padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom)); }
+
+/* 键盘弹起时：底部导航收起来，别挡输入 */
+body.kb { padding-bottom: 0; }
+body.kb .nav { display: none; }
 
 /* ---------- 顶栏 ---------- */
 .hd {
@@ -186,6 +202,13 @@ body { padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom)); }
 .chip.add { border-style: dashed; color: var(--brand); }
 .chip:active { background: #f0f4f6; }
 
+/* 货类按钮：比普通 chip 大一圈 */
+.chip.big-chip {
+  padding: 14px 18px; font-size: 18px; font-weight: 600;
+  border-radius: 13px; min-height: 54px;
+  display: inline-flex; align-items: center;
+}
+
 .nums { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .iw { position: relative; }
 .iw .unit { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); font-size: 13px; color: #8a9aa3; pointer-events: none; }
@@ -246,7 +269,8 @@ input.num:focus, input.txt:focus { border-color: var(--brand2); box-shadow: 0 0 
 
 /* ---------- 底部弹层 ---------- */
 .sheet {
-  position: fixed; inset: 0; z-index: 60;
+  position: fixed; top: 0; left: 0; right: 0; bottom: var(--kb);
+  z-index: 60;
   background: rgba(12,22,28,.42);
   display: flex; align-items: flex-end;
 }
@@ -277,6 +301,64 @@ input.num:focus, input.txt:focus { border-color: var(--brand2); box-shadow: 0 0 
 }
 .pitem:active { background: #f2f6f8; }
 .pitem .badge { margin-left: auto; font-size: 12px; color: var(--ink2); }
+
+/* 人名单：挤一点的格子，一个人不占一整行，字也不小 */
+.pgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+.pchip {
+  border: 1.5px solid var(--line); background: #fff; color: var(--ink);
+  border-radius: 11px; padding: 12px 8px; font-size: 17px; font-weight: 600;
+  font-family: inherit; cursor: pointer; min-height: 52px;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; line-height: 1.25; word-break: break-all;
+}
+.pchip:active { background: #e9f1f4; border-color: var(--brand2); }
+
+/* 价格条：选一个价，下面按这个价填 */
+.pricebar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pricechip {
+  border: 1.5px solid var(--line); background: #fff; color: var(--ink);
+  border-radius: 11px; padding: 11px 15px; font-size: 17px; font-weight: 700;
+  font-family: inherit; cursor: pointer; min-height: 48px;
+}
+.pricechip.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.pricechip.add { border-style: dashed; color: var(--brand); font-weight: 600; }
+
+/* 卖货名单：一行一个人，右边填斤数 */
+.roster-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 0; border-bottom: 1px solid #eef2f4;
+}
+.roster-row:last-of-type { border-bottom: 0; }
+.roster-name {
+  flex: 1; min-width: 0; font-size: 17px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.roster-in {
+  width: 96px; height: 48px; border: 1.5px solid var(--line); border-radius: 10px;
+  text-align: center; font-size: 20px; font-weight: 700; font-family: inherit;
+  color: var(--ink); background: #fff; outline: none; -webkit-appearance: none;
+}
+.roster-in:focus { border-color: var(--brand2); box-shadow: 0 0 0 3px rgba(18,101,127,.13); }
+.roster-price {
+  width: 62px; height: 44px; border: 1.5px solid var(--line); border-radius: 10px;
+  background: #f7fafb; color: var(--ink2); font-size: 15px; font-weight: 600;
+  font-family: inherit; cursor: pointer;
+}
+.roster-price.diff { background: #fdf3e4; border-color: #e8cf9c; color: var(--clear); }
+
+/* 打勾结清 */
+.btn.ok-btn { background: #e8f5ee; color: #1f7a5c; }
+.btn.ok-btn:active { background: #d8ecdf; }
+
+/* 欠款标题：显眼一点 */
+.debt-label {
+  font-size: 16px; font-weight: 700; color: var(--ink);
+}
+.debt-amt { font-size: 22px; font-weight: 800; }
 
 .toggle {
   display: flex; align-items: center; justify-content: space-between;

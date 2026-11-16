@@ -108,9 +108,45 @@
     return m.cells[0];
   }
 
+  /** 临时加的货类（存在用户数据里）。分法由她自己选，没选就是"不分" */
+  function registerExtra(list) {
+    (list || []).forEach(function (it) {
+      if (!it || !it.id || !it.name) return;
+      if (getItem(it.id)) return;
+      var modes = (Array.isArray(it.modes) && it.modes.length) ? it.modes
+        : [{ id: 'none', label: '不分', cells: [{ id: '-', label: it.name }] }];
+      ITEMS.push({
+        id: it.id, name: it.name, short: it.name, group: null,
+        modes: modes, defaultMode: modes[0].id, extra: true
+      });
+    });
+  }
+
+  function makeExtraItem(name) {
+    return {
+      id: 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      name: name
+    };
+  }
+
+  /** 新货类的分法：跟虾姑一样四种，进去再选 */
+  function extraModes(kind, name) {
+    function c(id, label) { return { id: id, label: label }; }
+    return [
+      { id: 'none', label: '不分', cells: [c('-', name)] },
+      { id: 'size', label: '分大小', cells: [c('big', '大'), c('small', '小')] },
+      { id: 'gao', label: '分有膏', cells: [c('g', '有膏'), c('w', '无膏')] },
+      {
+        id: 'both', label: '都分', cells: [
+          c('big-g', '大·有膏'), c('big-w', '大·无膏'),
+          c('small-g', '小·有膏'), c('small-w', '小·无膏')
+        ]
+      }
+    ];
+  }
+
   /** "花蟹 大公" 这种给人看的写法 */
-  function cellText(rec) {
-    var it = getItem(rec.itemId);
+  function cellText(rec) {    var it = getItem(rec.itemId);
     var short = it ? it.short : (rec.itemName || '');
     if (!rec.cellLabel || rec.modeId === 'none') return short;
     return short + ' ' + rec.cellLabel;
@@ -187,26 +223,13 @@
   }
 
   function emptyExpenses() {
-    return { workers: [], oil: 0, ice: 0, water: 0 };
+    return { workers: [], oil: 0, ice: 0, water: 0, stallFee: 0 };
   }
 
-  /** 场次可以存成字符串（老数据）或 {name, stallFee} */
-  function normSession(s) {
-    if (typeof s === 'string') return { name: s, stallFee: 0 };
-    if (s && s.name) return { name: s.name, stallFee: num(s.stallFee) };
-    return null;
-  }
-
-  function stallFeeTotal(sessions) {
-    return round2((sessions || []).reduce(function (a, x) {
-      var o = normSession(x);
-      return a + (o ? o.stallFee : 0);
-    }, 0));
-  }
-
-  function expenseTotal(ex, sessions) {
+  /** 支出合计：工人 + 油 + 冰 + 水 + 进场费 */
+  function expenseTotal(ex) {
     ex = ex || emptyExpenses();
-    var t = num(ex.oil) + num(ex.ice) + num(ex.water) + stallFeeTotal(sessions);
+    var t = num(ex.oil) + num(ex.ice) + num(ex.water) + num(ex.stallFee);
     (ex.workers || []).forEach(function (w) { t += num(w.amount); });
     return round2(t);
   }
@@ -216,7 +239,7 @@
     return r.kind !== 'buy' || r.priced !== false;
   }
 
-  function summarize(records, day, expenses, sessions) {
+  function summarize(records, day, expenses) {
     var rs = dayRecords(records, day);
     var out = {
       day: day,
@@ -245,7 +268,7 @@
     });
     out.income = round2(out.sellAmount + out.clearAmount);
     out.expenseGoods = out.buyAmount;
-    out.expenseOther = expenseTotal(expenses, sessions);
+    out.expenseOther = expenseTotal(expenses);
     out.expense = round2(out.expenseGoods + out.expenseOther);
     out.gross = round2(out.income - out.expense);
     return out;
@@ -378,6 +401,7 @@
 
   return {
     ITEMS: ITEMS, getItem: getItem, getMode: getMode, getCell: getCell,
+    registerExtra: registerExtra, makeExtraItem: makeExtraItem, extraModes: extraModes,
     cellText: cellText, cellTextTight: cellTextTight,
     dateStr: dateStr, parseDay: parseDay, addDays: addDays,
     businessDay: businessDay, dateLabelCN: dateLabelCN,
@@ -385,7 +409,6 @@
     calcAmount: calcAmount, amountOf: amountOf, hasRounding: hasRounding,
     paidOf: paidOf, owedOf: owedOf, isSettled: isSettled, isPriced: isPriced,
     dayRecords: dayRecords, emptyExpenses: emptyExpenses, expenseTotal: expenseTotal,
-    normSession: normSession, stallFeeTotal: stallFeeTotal,
     summarize: summarize, itemSummary: itemSummary, personSummary: personSummary,
     receivables: receivables, payables: payables, openRecordsOf: openRecordsOf,
     allocatePayment: allocatePayment, statement: statement
