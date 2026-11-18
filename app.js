@@ -4,7 +4,7 @@
 
   var L = window.Ledger;
   var DB_KEY = 'seafood-ledger-v3';
-  var VERSION = 'v3.6';
+  var VERSION = 'v3.8';
 
   var db = null;
   var day = null;
@@ -13,7 +13,6 @@
   var sheet = null;      // {type, ...}
   var pending = { num: null, text: null, person: null, cell: null };
   var priceDraft = {};   // 批量定价页里填了一半的价
-  var activePrices = {};  // 'item|cell|kind' -> 当前选中的价
   var lastRenderKey = '';
   var lastPick = null;   // 最近一次人名选择器的上下文
   var lastCellPick = null;
@@ -100,12 +99,20 @@
   }
 
   var toastTimer = null;
-  function toast(msg) {
+  var toastAction = null;
+
+  /** 提示条。给个 action 就会多一个能点的按钮（比如"撤"） */
+  function toast(msg, action) {
     var el = document.getElementById('toast');
-    el.textContent = msg;
+    toastAction = action || null;
+    el.innerHTML = '<span>' + esc(msg) + '</span>' +
+      (action ? '<button class="toast-act" data-act="toast-act">' + esc(action.label) + '</button>' : '');
     el.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.classList.remove('show'); }, 1900);
+    toastTimer = setTimeout(function () {
+      el.classList.remove('show');
+      toastAction = null;
+    }, action ? 4500 : 1900);
   }
 
   function today() { return L.businessDay(new Date(), db.config.cutoffHour); }
@@ -516,13 +523,10 @@
       m.cellPrices[key] = seed > 0 ? [seed] : [];
     }
     var prices = m.cellPrices[key];
-    if (!activePrices[key] || prices.indexOf(activePrices[key]) === -1) {
-      activePrices[key] = prices.length ? prices[prices.length - 1] : 0;
-    }
-    var active = activePrices[key];
 
-    var byPerson = {};
-    rs.forEach(function (r) { byPerson[r.person] = r; });
+    // 一个人可能在不同价都买了，所以按 "价 + 人" 存
+    var recAt = {};
+    rs.forEach(function (r) { recAt[L.num(r.price) + '|' + r.person] = r; });
 
     var names = personList('sell').slice();
     rs.forEach(function (r) {
@@ -534,82 +538,126 @@
 
     var h = '<div class="card">' +
       '<div class="card-title">' + esc(it.name) + (cellLabel && modeId !== 'none' ? ' · ' + esc(cellLabel) : '') +
-      '<span class="right">' + L.fmtJin(totJin) + '斤 · ¥' + L.fmtMoney(totAmt) + '</span></div>' +
-      '<div class="pricebar">' +
-      (prices.length
-        ? prices.map(function (p) {
-          return '<button class="pricechip' + (p === active ? ' on' : '') + '" data-act="pick-price" data-key="' + esc(key) + '" data-price="' + p + '">' + L.fmtMoney(p) + ' 元</button>';
-        }).join('')
-        : '<span class="muted" style="align-self:center">还没填价</span>') +
-      '<button class="pricechip add" data-act="new-price" data-key="' + esc(key) + '">＋ 加一个价</button>' +
-      '</div>' +
-      '<div class="muted" style="margin-top:8px">选中哪个价，下面填的人就按那个价算。降价了就再加一个价。</div>' +
-      '</div>';
+      '<span class="right" id="cell-total">' + L.fmtJin(totJin) + '斤 · ¥' + L.fmtMoney(totAmt) + '</span></div>' +
+      '<div class="muted">填完一个就点下一个，自己会记下。降价了就在下面再加一个价。</div></div>';
 
-    h += '<div class="card"><div class="card-title">谁买了 · 填斤数' +
-      '<span class="right">' + (active > 0 ? L.fmtMoney(active) + ' 元/斤' : '先选价') + '</span></div>';
-
-    if (!names.length) {
-      h += '<div class="empty">还没有客户名单<br>先去设置里粘进去，或下面加一个</div>';
-    } else {
-      names.forEach(function (nm) {
-        var r = byPerson[nm];
-        h += '<div class="roster-row">' +
-          '<div class="roster-name">' + esc(nm) + '</div>' +
-          '<input class="roster-in" inputmode="decimal" data-row-person="' + esc(nm) + '" value="' + (r ? L.fmtJin(r.jin) : '') + '" placeholder="—">' +
-          '<span class="roster-price' + (r && L.num(r.price) !== active ? ' diff' : '') + '">' +
-          (r ? L.fmtMoney(r.price) : (active > 0 ? L.fmtMoney(active) : '—')) + '</span>' +
-          '</div>';
-      });
+    if (!prices.length) {
+      h += '<div class="card"><div class="empty">还没有价<br>先加一个今天卖多少</div></div>';
     }
-    h += '<button class="btn ghost block" style="margin-top:10px" data-act="add-customer">＋ 加一个人</button>';
-    h += '</div>';
 
-    h += '<div class="card"><div class="card-title">这一档合计' +
-      '<span class="right">' + L.fmtJin(totJin) + '斤 · ¥' + L.fmtMoney(totAmt) + '</span></div>' +
-      '<div class="muted">填完斤数直接点别处就行，会自动记下。</div></div>';
+    prices.forEach(function (p, idx) {
+      var bj = 0, ba = 0;
+      names.forEach(function (nm) {
+        var r = recAt[p + '|' + nm];
+        if (r) { bj += L.num(r.jin); ba += L.amountOf(r); }
+      });
+
+      h += '<div class="card pblock">' +
+        '<div class="pblock-hd">' +
+        '<b>' + L.fmtMoney(p) + ' 元/斤</b>' +
+        '<span class="pblock-sum" id="bt-' + p + '">' + L.fmtJin(bj) + '斤 · ¥' + L.fmtMoney(ba) + '</span>' +
+        '<button class="row-del" data-act="del-price" data-key="' + esc(key) + '" data-price="' + p + '">✕</button>' +
+        '</div>';
+
+      if (!names.length) {
+        h += '<div class="empty">还没有客户名单<br>先去设置里粘进去</div>';
+      } else {
+        names.forEach(function (nm) {
+          var r = recAt[p + '|' + nm];
+          h += '<div class="roster-row">' +
+            '<div class="roster-name">' + esc(nm) + '</div>' +
+            '<input class="roster-in" inputmode="decimal" data-row-person="' + esc(nm) +
+            '" data-row-price="' + p + '" value="' + (r ? L.fmtJin(r.jin) : '') + '" placeholder="—">' +
+            '</div>';
+        });
+      }
+      h += '</div>';
+    });
+
+    h += '<button class="btn primary block" data-act="new-price" data-key="' + esc(key) + '">' +
+      (prices.length ? '＋ 再加一个价' : '＋ 加一个价') + '</button>';
+
+    h += '<div class="card" style="margin-top:11px"><div class="row2">' +
+      '<button class="btn ghost" data-act="add-customer">＋ 加一个人</button>' +
+      '<button class="btn ghost" data-act="manage-people">管理名单</button>' +
+      '</div></div>';
     return h;
   }
 
   function cellKey(itemId, cellId, kind) { return itemId + '|' + cellId + '|' + kind; }
 
-  /** 卖货一行填完 → 立刻落库（空着就是删掉这一笔） */
-  function commitRosterRow(person, rawValue) {
+  /** 只刷新合计，不重画整页 —— 重画会把刚要点的下一个输入框弄丢 */
+  function refreshCellTotals() {
+    var itemId = route.item, kind = route.kind, cellId = route.cell;
+    if (!itemId || !cellId) return;
+    var rs = db.records.filter(function (r) {
+      return r.day === day && r.itemId === itemId && r.cellId === cellId && r.kind === kind;
+    });
+    var totJin = 0, totAmt = 0, byPrice = {};
+    rs.forEach(function (r) {
+      var j = L.num(r.jin), a = L.amountOf(r);
+      totJin += j; totAmt += a;
+      var pk = L.num(r.price);
+      if (!byPrice[pk]) byPrice[pk] = { j: 0, a: 0 };
+      byPrice[pk].j += j; byPrice[pk].a += a;
+    });
+    var t = document.getElementById('cell-total');
+    if (t) t.textContent = L.fmtJin(totJin) + '斤 · ¥' + L.fmtMoney(totAmt);
+
+    var prices = (dayMeta(day).cellPrices || {})[cellKey(itemId, cellId, kind)] || [];
+    prices.forEach(function (p) {
+      var b = document.getElementById('bt-' + p);
+      if (!b) return;
+      var o = byPrice[p] || { j: 0, a: 0 };
+      b.textContent = L.fmtJin(o.j) + '斤 · ¥' + L.fmtMoney(o.a);
+    });
+  }
+
+  /** 从客户名单里删人。已经有账的人不给删，免得账里孤零零留着个名字 */
+  function removeCustomer(name) {
+    var used = db.records.some(function (r) { return r.person === name; });
+    if (used) { toast('这个人已经有账了，先留着'); return; }
+    db.config.customers = db.config.customers.filter(function (x) { return x !== name; });
+    persist(); render();
+    toast('删掉了 ' + name);
+  }
+
+  /** 卖货一行填完 → 立刻落库（空着就是删掉这个价下的这一笔） */
+  function commitRosterRow(person, price, rawValue) {
     var itemId = route.item, kind = route.kind, modeId = route.mode, cellId = route.cell;
     if (!itemId || !cellId) return;
     var jin = L.num(rawValue);
+    var p = L.num(price);
 
     var rec = db.records.filter(function (r) {
       return r.day === day && r.person === person && r.itemId === itemId &&
-        r.cellId === cellId && r.kind === kind;
+        r.cellId === cellId && r.kind === kind && L.num(r.price) === p;
     })[0];
 
     if (!(jin > 0)) {
       if (rec) {
         undoSnapshot('删掉一笔');
         db.records = db.records.filter(function (r) { return r.id !== rec.id; });
-        persist(); render();
+        persist();
+        refreshCellTotals();
       }
       return;
     }
 
-    var price = activePrices[cellKey(itemId, cellId, kind)] || 0;
-    if (!(price > 0)) { toast('先在上面选个价'); return; }
-
     if (rec) {
       undoSnapshot('改一斤数');
       rec.jin = jin;
-      rec.amount = L.round2(jin * price);
-      rec.price = price;
+      rec.amount = L.round2(jin * p);
     } else {
       addRecord({
         kind: kind, person: person, itemId: itemId, itemName: L.getItem(itemId).name,
         modeId: modeId, cellId: cellId,
         cellLabel: (L.getCell(itemId, modeId, cellId) || {}).label || '',
-        jin: jin, price: price, amount: L.round2(jin * price)
+        jin: jin, price: p, amount: L.round2(jin * p)
       });
     }
-    persist(); render();
+    persist();
+    refreshCellTotals();
   }
 
   // ================= 损耗 =================
@@ -1300,39 +1348,72 @@
         });
         break;
 
-      case 'pick-price': {
-        var pk = D('data-key');
-        activePrices[pk] = L.num(D('data-price'));
-        var pp = pk.split('|');
-        setPrice(pp[0], pp[1], pp[2], activePrices[pk]);
-        render();
-        break;
-      }
-
       case 'new-price': {
         var nk = D('data-key');
         var np = nk.split('|');
-        promptNum('加一个价', { sub: '降价了、或者有人讲价了，就加一个', ph: '元/斤', unit: '元/斤' }, function (v) {
+        var lastP = priceOf(np[0], null, np[1], np[2]);
+        promptNum('加一个价', {
+          sub: '降价了、或者有人讲价了，就加一个',
+          ph: '元/斤', unit: '元/斤', value: lastP > 0 ? lastP : ''
+        }, function (v) {
           if (!(v > 0)) { toast('要填个数'); return; }
           undoSnapshot('加一个价');
-          var m = dayMeta(day);
-          if (!m.cellPrices) m.cellPrices = {};
-          if (!Array.isArray(m.cellPrices[nk])) m.cellPrices[nk] = [];
-          if (m.cellPrices[nk].indexOf(v) === -1) m.cellPrices[nk].push(v);
-          activePrices[nk] = v;
+          var mm = dayMeta(day);
+          if (!mm.cellPrices) mm.cellPrices = {};
+          if (!Array.isArray(mm.cellPrices[nk])) mm.cellPrices[nk] = [];
+          if (mm.cellPrices[nk].indexOf(v) === -1) mm.cellPrices[nk].push(v);
           setPrice(np[0], np[1], np[2], v);
           persist(); render();
-          toast('换成 ' + L.fmtMoney(v) + ' 元了');
         });
         break;
       }
+
+      case 'del-price': {
+        var dk = D('data-key');
+        var dp = L.num(D('data-price'));
+        var used = db.records.some(function (r) {
+          return r.day === day && r.itemId === route.item && r.cellId === route.cell &&
+            r.kind === route.kind && L.num(r.price) === dp;
+        });
+        if (used && !window.confirm('这个价下面已经记了账，一起删掉？')) break;
+        undoSnapshot('删一个价');
+        var dm = dayMeta(day);
+        if (dm.cellPrices && dm.cellPrices[dk]) {
+          dm.cellPrices[dk] = dm.cellPrices[dk].filter(function (x) { return x !== dp; });
+        }
+        db.records = db.records.filter(function (r) {
+          return !(r.day === day && r.itemId === route.item && r.cellId === route.cell &&
+            r.kind === route.kind && L.num(r.price) === dp);
+        });
+        persist(); render();
+        toast('删掉了这个价');
+        break;
+      }
+
+      case 'manage-people':
+        go('settings');
+        break;
 
       case 'add-customer': {
         promptText('加一个客户', { ph: '比如 王哥(虾)' }, function (v) {
           if (!v) return;
-          if (db.config.customers.indexOf(v) === -1) db.config.customers.push(v);
+          if (db.config.customers.indexOf(v) !== -1) { toast('已经有这个人了'); return; }
+          undoSnapshot('加一个人');
+          db.config.customers.push(v);
           persist(); render();
+          toast('已加 ' + v, {
+            label: '撤',
+            fn: function () { removeCustomer(v); }
+          });
         });
+        break;
+      }
+
+      case 'toast-act': {
+        var tb = toastAction;
+        toastAction = null;
+        document.getElementById('toast').classList.remove('show');
+        if (tb) tb.fn();
         break;
       }
 
@@ -1398,9 +1479,20 @@
       case 'add-person':
         promptText('新的档口', { ph: '比如 老陈' }, function (v) {
           if (!v) return;
-          if (db.config.stalls.indexOf(v) === -1) db.config.stalls.push(v);
+          if (db.config.stalls.indexOf(v) !== -1) { go('buyEntry', { person: v, ff: {} }); return; }
+          undoSnapshot('加一个档口');
+          db.config.stalls.push(v);
           persist();
           go('buyEntry', { person: v, ff: {} });
+          toast('已加 ' + v, {
+            label: '撤',
+            fn: function () {
+              if (db.records.some(function (r) { return r.person === v; })) { toast('这家已经有账了'); return; }
+              db.config.stalls = db.config.stalls.filter(function (x) { return x !== v; });
+              persist(); back();
+              toast('删掉了 ' + v);
+            }
+          });
         });
         break;
 
@@ -1782,21 +1874,12 @@
     }
   });
 
-  // 输入框失焦：卖货名单填斤数、这一档的价
+  // 输入框失焦：卖货名单填斤数
   document.addEventListener('change', function (e) {
     var el = e.target;
     if (!el || !el.getAttribute) return;
-
-    var pf = el.getAttribute('data-price-for');
-    if (pf) {
-      var parts = pf.split('|');
-      setPrice(parts[0], parts[1], parts[2], L.num(el.value));
-      toast(L.num(el.value) > 0 ? '价记下了' : '价清空了');
-      return;
-    }
-
     var rp = el.getAttribute('data-row-person');
-    if (rp) { commitRosterRow(rp, el.value); return; }
+    if (rp) { commitRosterRow(rp, el.getAttribute('data-row-price'), el.value); }
   });
 
   // 回车确认

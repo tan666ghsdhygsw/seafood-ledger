@@ -317,6 +317,15 @@ input.num:focus, input.txt:focus { border-color: var(--brand2); box-shadow: 0 0 
 }
 .pchip:active { background: #e9f1f4; border-color: var(--brand2); }
 
+/* 一个价一块：块头是价，下面是这一价买的人 */
+.pblock { border-left: 4px solid #b9d3dd; }
+.pblock-hd {
+  display: flex; align-items: center; gap: 10px;
+  padding-bottom: 9px; margin-bottom: 4px; border-bottom: 1px solid var(--line);
+}
+.pblock-hd b { font-size: 19px; color: var(--brand); }
+.pblock-sum { margin-left: auto; font-size: 13px; color: var(--ink2); }
+
 /* 价格条：选一个价，下面按这个价填 */
 .pricebar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .pricechip {
@@ -399,6 +408,11 @@ input.num:focus, input.txt:focus { border-color: var(--brand2); box-shadow: 0 0 
   max-width: 82vw; text-align: center;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast-act {
+  margin-left: 10px; border: 0; border-radius: 8px; padding: 5px 13px;
+  background: #fff; color: #16232b; font-size: 15px; font-weight: 700;
+  font-family: inherit; cursor: pointer;
+}
 
 /* 悬浮的"下一笔" */
 .fab {
