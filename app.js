@@ -4,7 +4,7 @@
 
   var L = window.Ledger;
   var DB_KEY = 'seafood-ledger-v3';
-  var VERSION = 'v3.5';
+  var VERSION = 'v3.6';
 
   var db = null;
   var day = null;

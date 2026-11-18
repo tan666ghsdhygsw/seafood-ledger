@@ -27,12 +27,12 @@
       id: 'yingke', name: '虾姑', short: '虾姑', group: null,
       modes: [
         { id: 'none', label: '不分', cells: [c('-', '虾姑')] },
-        { id: 'gao', label: '分有膏', cells: [c('g', '有膏'), c('w', '无膏')] },
+        { id: 'gao', label: '分有膏', cells: [c('w', '无膏'), c('g', '有膏')] },
         { id: 'size', label: '分大小', cells: [c('big', '大'), c('small', '小')] },
         {
           id: 'both', label: '都分', cells: [
-            c('big-g', '大·有膏'), c('big-w', '大·无膏'),
-            c('small-g', '小·有膏'), c('small-w', '小·无膏')
+            c('big-w', '大·无膏'), c('big-g', '大·有膏'),
+            c('small-w', '小·无膏'), c('small-g', '小·有膏')
           ]
         }
       ],
@@ -42,12 +42,12 @@
       id: 'dachangjin', name: '大长劲', short: '大长劲', group: null,
       modes: [
         { id: 'none', label: '不分', cells: [c('-', '大长劲')] },
-        { id: 'gao', label: '分有膏', cells: [c('g', '有膏'), c('w', '无膏')] },
+        { id: 'gao', label: '分有膏', cells: [c('w', '无膏'), c('g', '有膏')] },
         { id: 'size', label: '分大小', cells: [c('big', '大'), c('small', '小')] },
         {
           id: 'both', label: '都分', cells: [
-            c('big-g', '大·有膏'), c('big-w', '大·无膏'),
-            c('small-g', '小·有膏'), c('small-w', '小·无膏')
+            c('big-w', '大·无膏'), c('big-g', '大·有膏'),
+            c('small-w', '小·无膏'), c('small-g', '小·有膏')
           ]
         }
       ],
@@ -135,11 +135,11 @@
     return [
       { id: 'none', label: '不分', cells: [c('-', name)] },
       { id: 'size', label: '分大小', cells: [c('big', '大'), c('small', '小')] },
-      { id: 'gao', label: '分有膏', cells: [c('g', '有膏'), c('w', '无膏')] },
+      { id: 'gao', label: '分有膏', cells: [c('w', '无膏'), c('g', '有膏')] },
       {
         id: 'both', label: '都分', cells: [
-          c('big-g', '大·有膏'), c('big-w', '大·无膏'),
-          c('small-g', '小·有膏'), c('small-w', '小·无膏')
+          c('big-w', '大·无膏'), c('big-g', '大·有膏'),
+          c('small-w', '小·无膏'), c('small-g', '小·有膏')
         ]
       }
     ];
